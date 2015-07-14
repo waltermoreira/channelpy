@@ -163,6 +163,9 @@ def test(uri):
     b = Channel(uri=uri)
     c = Channel(uri=uri)
 
+    a.put(5)
+    b.put('foo')
+
     x = a.get()
     assert isinstance(x, int)
 
