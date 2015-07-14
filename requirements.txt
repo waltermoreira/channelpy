@@ -1,3 +1,3 @@
+-e git+git://github.com/gmr/rabbitpy.git@b2c33d5ccade60977347d1ef6cce4dd5fb403c4c#egg=rabbitpy
 pamqp==1.6.1
-rabbitpy==0.26.2
 wsgiref==0.1.2
