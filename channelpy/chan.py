@@ -149,14 +149,20 @@ class Channel(object):
         self._conn.delete()
 
 
-def test(a, b, c):
+def test(uri):
     """
+    a: ChanIn[int]
+    b: ChanIn[str]
+    c: ChanOut[Dict]
+    d: ChanOut[int]
 
-    :type a: ChanIn[int]
-    :type b: ChanIn[str]
-    :type c: ChanOut[Dict]
+    :type uri: str
     :rtype: ChanOut[int]
     """
+    a = Channel(uri=uri)
+    b = Channel(uri=uri)
+    c = Channel(uri=uri)
+
     x = a.get()
     assert isinstance(x, int)
 
