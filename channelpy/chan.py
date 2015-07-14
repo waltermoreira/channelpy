@@ -5,7 +5,7 @@ import uuid
 import rabbitpy
 
 
-class TimeoutException(Exception):
+class ChannelTimeoutException(Exception):
     pass
 
 
@@ -132,7 +132,7 @@ class Channel(object):
             if msg is not None:
                 return self._process(msg)
             if time.time() - start > timeout:
-                raise TimeoutException()
+                raise ChannelTimeoutException()
             time.sleep(self.POLL_FREQUENCY)
 
     def _process(self, msg):
