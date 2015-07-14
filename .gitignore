@@ -2,3 +2,4 @@
 channelpy.egg-info
 __pycache__
 dist
+*.pyc
