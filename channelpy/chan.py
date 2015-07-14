@@ -52,6 +52,8 @@ class RabbitConnection(AbstractConnection):
     def __init__(self, uri):
         self._uri = uri or 'ampq://127.0.0.1:5672'
         self._ch = None
+        self._name = None
+        self._queue = None
 
     def connect(self):
         if self._conn is None or not self._conn._io.is_alive():
@@ -135,7 +137,8 @@ class Channel(object):
                 raise ChannelTimeoutException()
             time.sleep(self.POLL_FREQUENCY)
 
-    def _process(self, msg):
+    @staticmethod
+    def _process(msg):
         return json.loads(msg, object_hook=as_channel)
 
     def put(self, value):
