@@ -103,13 +103,14 @@ class Channel(object):
 
     POLL_FREQUENCY = 0.1  # seconds
 
-    def __init__(self, name=None, uri=None):
+    def __init__(self, name=None, uri=None, persist=False):
         """
         :type name: str
         :type uri: str
         """
         self.uri = uri
         self._name = name or uuid.uuid4().hex
+        self._persist = persist
         self._conn = RabbitConnection(uri, self._name)
 
     def __enter__(self):
@@ -117,7 +118,9 @@ class Channel(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         del exc_type, exc_val, exc_tb
-        self._conn.close()
+        if not self._persist:
+            self.delete()
+        self.close()
 
     def get(self, timeout=float('inf')):
         start = time.time()
