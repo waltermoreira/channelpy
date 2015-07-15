@@ -11,21 +11,7 @@ class ChannelTimeoutException(Exception):
 
 class AbstractConnection(object):
 
-    def connect(self):
-        """Connect to the message broker.
-
-        This method should be idempotent.
-        """
-        pass
-
     def close(self):
-        pass
-
-    def setup(self, name):
-        """Setup a queue ``name`` in the broker.
-
-        :type name: str
-        """
         pass
 
     def delete(self):
@@ -49,41 +35,50 @@ class RabbitConnection(AbstractConnection):
 
     _conn = None
 
-    def __init__(self, uri):
-        self._uri = uri or 'ampq://127.0.0.1:5672'
-        self._ch = None
-        self._name = None
-        self._queue = None
-
-    def connect(self):
-        if self._conn is None or not self._conn._io.is_alive():
-            RabbitConnection._conn = rabbitpy.Connection(self._uri)
-
-        if self._ch is None or self._ch.closed:
-            self._ch = self._conn.channel()
-
-    def setup(self, name):
+    def __init__(self, uri, name):
+        self._uri = uri or 'amqp://127.0.0.1:5672'
         self._name = name
-        self._queue = rabbitpy.Queue(self._ch, name)
+        self._reconnect()
+
+    def _reconnect(self):
+        self._conn = rabbitpy.Connection(self._uri)
+        self._ch = self._conn.channel()
+        self._queue = rabbitpy.Queue(self._ch, self._name)
         self._queue.durable = True
         self._queue.declare()
 
     def close(self):
         self._ch.close()
+        self._conn.close()
 
     def delete(self):
         self._queue.delete()
 
-    def get(self):
+    def _retrying(self, f):
+        def wrapper(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except rabbitpy.exceptions.AMQPException:
+                self._reconnect()
+                return f(*args, **kwargs)
+        return wrapper
+
+    def _get(self):
         msg = self._queue.get()
         if msg is None:
             return None
         msg.ack()
         return msg.body
 
-    def put(self, msg):
+    def get(self):
+        return self._retrying(self._get)()
+
+    def _put(self, msg):
         _msg = rabbitpy.Message(self._ch, msg, {})
         _msg.publish('', self._name)
+
+    def put(self, msg):
+        self._retrying(self._put)(msg)
 
 
 class ChannelEncoder(json.JSONEncoder):
@@ -115,9 +110,7 @@ class Channel(object):
         """
         self.uri = uri
         self._name = name or uuid.uuid4().hex
-        self._conn = RabbitConnection(uri)
-        self._conn.connect()
-        self._conn.setup(self._name)
+        self._conn = RabbitConnection(uri, self._name)
 
     def __enter__(self):
         return self
@@ -127,7 +120,6 @@ class Channel(object):
         self._conn.close()
 
     def get(self, timeout=float('inf')):
-        self._conn.connect()
         start = time.time()
         while True:
             msg = self._conn.get()
@@ -142,7 +134,6 @@ class Channel(object):
         return json.loads(msg, object_hook=as_channel)
 
     def put(self, value):
-        self._conn.connect()
         self._conn.put(json.dumps(value, cls=ChannelEncoder))
 
     def close(self):
