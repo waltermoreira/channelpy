@@ -128,7 +128,7 @@ class Channel(object):
         while True:
             msg = self._conn.get()
             if msg is not None:
-                return self._process(msg)
+                return self._process(msg.decode('utf-8'))
             if time.time() - start > timeout:
                 raise ChannelTimeoutException()
             time.sleep(self.POLL_FREQUENCY)
@@ -138,11 +138,11 @@ class Channel(object):
         return json.loads(msg, object_hook=as_channel)
 
     def put(self, value):
-        self._conn.put(json.dumps(value, cls=ChannelEncoder))
+        self._conn.put(json.dumps(value, cls=ChannelEncoder).encode('utf-8'))
 
     def close(self):
         self._conn.close()
-        
+
     def delete(self):
         self._conn.delete()
 
