@@ -3,6 +3,7 @@ import time
 import uuid
 
 import rabbitpy
+import rabbitpy.exceptions
 
 
 class ChannelTimeoutException(Exception):
