@@ -137,6 +137,9 @@ class Channel(object):
         self._conn.put(json.dumps(value, cls=ChannelEncoder))
 
     def close(self):
+        self._conn.close()
+        
+    def delete(self):
         self._conn.delete()
 
 
