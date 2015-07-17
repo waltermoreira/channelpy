@@ -10,6 +10,10 @@ class ChannelTimeoutException(Exception):
     pass
 
 
+class ChannelClosedException(Exception):
+    pass
+
+
 class AbstractConnection(object):
 
     def close(self):
@@ -126,6 +130,8 @@ class Channel(object):
     def get(self, timeout=float('inf')):
         start = time.time()
         while True:
+            if self._conn is None:
+                raise ChannelClosedException()
             msg = self._conn.get()
             if msg is not None:
                 return self._process(msg.decode('utf-8'))
@@ -138,12 +144,17 @@ class Channel(object):
         return json.loads(msg, object_hook=as_channel)
 
     def put(self, value):
+        if self._conn is None:
+            raise ChannelClosedException()
         self._conn.put(json.dumps(value, cls=ChannelEncoder).encode('utf-8'))
 
     def close(self):
         self._conn.close()
+        self._conn = None
 
     def delete(self):
+        if self._conn is None:
+            raise ChannelClosedException()
         self._conn.delete()
 
     def put_sync(self, value, timeout=float('inf')):
