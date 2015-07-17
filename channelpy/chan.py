@@ -146,6 +146,23 @@ class Channel(object):
     def delete(self):
         self._conn.delete()
 
+    def put_sync(self, value, timeout=float('inf')):
+        """Synchronous put.
+
+        Wraps the object ``value`` in the form::
+
+            {"value": value, "reply_to": ch}
+
+        and waits for a response in ``ch``.
+
+        """
+        with Channel(uri=self.uri) as ch:
+            self.put({
+                'value': value,
+                'reply_to': ch
+            })
+            return ch.get(timeout=timeout)
+
 
 def test(uri):
     """
