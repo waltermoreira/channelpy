@@ -14,6 +14,10 @@ class ChannelClosedException(Exception):
     pass
 
 
+class ChannelEventException(Exception):
+    pass
+
+
 class AbstractConnection(object):
 
     def close(self):
@@ -48,16 +52,42 @@ class RabbitConnection(AbstractConnection):
     def _reconnect(self):
         self._conn = rabbitpy.Connection(self._uri)
         self._ch = self._conn.channel()
+
+        self._exchange = rabbitpy.FanoutExchange(
+            self._ch, self._name, durable=True)
+        self._exchange.declare()
+
+        self._event_queue = rabbitpy.Queue(self._ch, exclusive=True)
+        self._event_queue.declare()
+
         self._queue = rabbitpy.Queue(self._ch, self._name)
         self._queue.durable = True
         self._queue.declare()
 
+        self._event_queue.bind(self._exchange)
+
     def close(self):
+        """Close this instance of the channel."""
+
         self._ch.close()
         self._conn.close()
 
+    def event(self, ev):
+        """Close all connected instances to this channel."""
+        msg = rabbitpy.Message(self._ch, ev)
+        msg.publish(self._exchange, '')
+
     def delete(self):
+        """Delete the queue completely."""
+
         self._queue.delete()
+        self.close()
+
+    def _check_for_events(self):
+        ev = self._event_queue.get()
+        if ev is not None:
+            ev.ack()
+            raise ChannelEventException(ev.body)
 
     def _retrying(self, f):
         def wrapper(*args, **kwargs):
@@ -69,6 +99,7 @@ class RabbitConnection(AbstractConnection):
         return wrapper
 
     def _get(self):
+        self._check_for_events()
         msg = self._queue.get()
         if msg is None:
             return None
@@ -79,6 +110,7 @@ class RabbitConnection(AbstractConnection):
         return self._retrying(self._get)()
 
     def _put(self, msg):
+        self._check_for_events()
         _msg = rabbitpy.Message(self._ch, msg, {})
         _msg.publish('', self._name)
 
@@ -128,16 +160,20 @@ class Channel(object):
         self.close()
 
     def get(self, timeout=float('inf')):
-        start = time.time()
-        while True:
-            if self._conn is None:
-                raise ChannelClosedException()
-            msg = self._conn.get()
-            if msg is not None:
-                return self._process(msg.decode('utf-8'))
-            if time.time() - start > timeout:
-                raise ChannelTimeoutException()
-            time.sleep(self.POLL_FREQUENCY)
+        try:
+            start = time.time()
+            while True:
+                if self._conn is None:
+                    raise ChannelClosedException()
+                msg = self._conn.get()
+                if msg is not None:
+                    return self._process(msg.decode('utf-8'))
+                if time.time() - start > timeout:
+                    raise ChannelTimeoutException()
+                time.sleep(self.POLL_FREQUENCY)
+        except ChannelEventException:
+            self.close()
+            raise ChannelClosedException
 
     @staticmethod
     def _process(msg):
@@ -146,7 +182,12 @@ class Channel(object):
     def put(self, value):
         if self._conn is None:
             raise ChannelClosedException()
-        self._conn.put(json.dumps(value, cls=ChannelEncoder).encode('utf-8'))
+        try:
+            self._conn.put(
+                json.dumps(value, cls=ChannelEncoder).encode('utf-8'))
+        except ChannelEventException:
+            self.close()
+            raise ChannelClosedException
 
     def close(self):
         self._conn.close()
@@ -156,6 +197,10 @@ class Channel(object):
         if self._conn is None:
             raise ChannelClosedException()
         self._conn.delete()
+        self.close()
+
+    def close_all(self):
+        self._conn.event('close')
 
     def put_sync(self, value, timeout=float('inf')):
         """Synchronous put.
