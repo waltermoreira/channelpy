@@ -184,7 +184,7 @@ class Channel(object):
                 time.sleep(self.POLL_FREQUENCY)
         except ChannelEventException:
             self.close()
-            raise ChannelClosedException
+            raise ChannelClosedException()
 
     @staticmethod
     def _process(msg):
@@ -198,7 +198,7 @@ class Channel(object):
                 json.dumps(value, cls=ChannelEncoder).encode('utf-8'))
         except ChannelEventException:
             self.close()
-            raise ChannelClosedException
+            raise ChannelClosedException()
 
     def close(self):
         self._conn.close()
