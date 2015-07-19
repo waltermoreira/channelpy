@@ -1,3 +1,9 @@
-from .chan import Channel, ChannelTimeoutException
+from .chan import (Channel, ChannelException, ChannelTimeoutException,
+                   ChannelClosedException, ChannelEventException)
 
-__all__ = ['Channel', 'ChannelTimeoutException']
+
+__all__ = ['Channel',
+           'ChannelException',
+           'ChannelTimeoutException',
+           'ChannelClosedException',
+           'ChannelEventException']
