@@ -25,6 +25,7 @@ class ChannelEventException(ChannelException):
 class AbstractConnection(object):
 
     def close(self):
+        """Close this instance of the channel. """
         pass
 
     def delete(self):
@@ -32,13 +33,15 @@ class AbstractConnection(object):
         pass
 
     def get(self):
-        """
+        """Non-blocking get.  Return None if empty.
+
         :rtype: Optional[T]
         """
         pass
 
     def put(self, msg):
-        """
+        """Non-blocking put.
+
         :type msg: T
         """
         pass
