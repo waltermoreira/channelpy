@@ -98,7 +98,10 @@ class RabbitConnection(AbstractConnection):
         def wrapper(*args, **kwargs):
             try:
                 return f(*args, **kwargs)
-            except rabbitpy.exceptions.AMQPException:
+            except rabbitpy.exceptions.AMQPNotFound:
+                raise ChannelClosedException()
+            except (rabbitpy.exceptions.AMQPException,
+                    rabbitpy.exceptions.RabbitpyException):
                 self._reconnect()
                 return f(*args, **kwargs)
         return wrapper
