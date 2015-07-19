@@ -201,6 +201,8 @@ class Channel(object):
             raise ChannelClosedException()
 
     def close(self):
+        if self._conn is None:
+            raise ChannelClosedException()
         self._conn.close()
         self._conn = None
 
@@ -211,6 +213,8 @@ class Channel(object):
         self.close()
 
     def close_all(self):
+        if self._conn is None:
+            raise ChannelClosedException()
         self._conn.event('close')
         self.close()
 
