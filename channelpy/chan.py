@@ -85,6 +85,7 @@ class RabbitConnection(AbstractConnection):
         """Delete the queue completely."""
 
         self._queue.delete()
+        self._exchange.delete()
         self.close()
 
     def _check_for_events(self):
