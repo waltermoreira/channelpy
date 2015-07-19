@@ -168,7 +168,8 @@ class Channel(object):
         del exc_type, exc_val, exc_tb
         if not self._persist:
             self.delete()
-        self.close()
+        else:
+            self.close()
 
     def get(self, timeout=float('inf')):
         try:
