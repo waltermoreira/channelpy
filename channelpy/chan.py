@@ -6,15 +6,19 @@ import rabbitpy
 import rabbitpy.exceptions
 
 
-class ChannelTimeoutException(Exception):
+class ChannelException(Exception):
     pass
 
 
-class ChannelClosedException(Exception):
+class ChannelTimeoutException(ChannelException):
     pass
 
 
-class ChannelEventException(Exception):
+class ChannelClosedException(ChannelException):
+    pass
+
+
+class ChannelEventException(ChannelException):
     pass
 
 
