@@ -109,35 +109,29 @@ def test_multiple_consumers(anon_ch):
     assert anon_ch.get() == 2
 
 
-# def test_events():
-#     pass
-#
-#
-
 def test_close_all(closing_ch):
-    resp = channelpy.Channel(uri=BROKER_URI)
+    with channelpy.Channel(uri=BROKER_URI) as resp:
+        a = channelpy.Channel(name=closing_ch._name, uri=closing_ch.uri)
+        b = channelpy.Channel(name=closing_ch._name, uri=closing_ch.uri)
 
-    a = channelpy.Channel(name=closing_ch._name, uri=closing_ch.uri)
-    b = channelpy.Channel(name=closing_ch._name, uri=closing_ch.uri)
+        def consume(name, ch, resp):
+            try:
+                ch.get()
+            except channelpy.ChannelClosedException:
+                resp.put(name)
 
-    def consume(name, ch, resp):
-        try:
-            ch.get()
-        except channelpy.ChannelClosedException:
-            resp.put(name)
+        ta = threading.Thread(target=consume, args=('a', a, resp))
+        ta.start()
+        tb = threading.Thread(target=consume, args=('b', b, resp))
+        tb.start()
 
-    ta = threading.Thread(target=consume, args=('a', a, resp))
-    ta.start()
-    tb = threading.Thread(target=consume, args=('b', b, resp))
-    tb.start()
+        assert ta.is_alive() and tb.is_alive()
 
-    assert ta.is_alive() and tb.is_alive()
-    
-    closing_ch.close_all()
+        closing_ch.close_all()
 
-    results = set()
-    results.add(resp.get(timeout=2))
-    results.add(resp.get(timeout=2))
+        results = set()
+        results.add(resp.get(timeout=2))
+        results.add(resp.get(timeout=2))
 
-    assert results == {'a', 'b'}
+        assert results == {'a', 'b'}
 
