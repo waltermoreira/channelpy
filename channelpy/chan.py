@@ -206,6 +206,7 @@ class Channel(object):
 
     def close_all(self):
         self._conn.event('close')
+        self.close()
 
     def put_sync(self, value, timeout=float('inf')):
         """Synchronous put.
