@@ -96,12 +96,13 @@ class AbstractConnection(object):
         :type queue: queue
         """
 
-    def retrying(self, f, *args, **kwargs):
-        """Evaluate f(*args, **kwargs). Retry on RetryException.
+    def retrying(self, f):
+        """A wrapper for functions that need retrying on errors.
+
+        Raise RetryException to rebuild connection and retry.
 
         :type f: Callable
         """
-        pass
 
 
 class RabbitConnection(AbstractConnection):
@@ -183,6 +184,17 @@ class RabbitConnection(AbstractConnection):
         _msg = rabbitpy.Message(self._ch, msg, {})
         _msg.publish('', queue.name)
 
+    def retrying(self, f):
+        def wrapper(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except rabbitpy.exceptions.AMQPNotFound:
+                raise ChannelClosedException()
+            except (rabbitpy.exceptions.AMQPException,
+                    rabbitpy.exceptions.RabbitpyException):
+                raise RetryException()
+        return wrapper
+
 
 class Queue(object):
 
@@ -206,7 +218,7 @@ class Queue(object):
     def event(self, ev):
         """Publish an event."""
 
-        self.connection.publish(ev)
+        self.connection.publish(ev, self._pubsub)
 
     def delete(self):
         """Delete the queue completely."""
@@ -221,15 +233,15 @@ class Queue(object):
             raise ChannelEventException(ev)
 
     def _retrying(self, f):
+        _f = self.connection.retrying(f)
+
         def wrapper(*args, **kwargs):
             try:
-                return f(*args, **kwargs)
-            except rabbitpy.exceptions.AMQPNotFound:
-                raise ChannelClosedException()
-            except (rabbitpy.exceptions.AMQPException,
-                    rabbitpy.exceptions.RabbitpyException):
+                return _f(*args, **kwargs)
+            except RetryException:
                 self._reconnect()
                 return f(*args, **kwargs)
+
         return wrapper
 
     def _get(self):
@@ -253,15 +265,22 @@ class ChannelEncoder(json.JSONEncoder):
         if isinstance(obj, Channel):
             return {
                 '__channel__': True,
-                'name': obj._name,
-                'uri': obj.uri
+                'name': obj.name,
+                'connection_type': obj.connection_type.__name__,
+                'connection_args': obj.connection_args,
+                'persist': obj._persist
             }
         return super(ChannelEncoder, self).default(obj)
 
 
 def as_channel(dct):
     if '__channel__' in dct:
-        return Channel(dct['name'], dct['uri'])
+        class_name = dct['connection_type']
+        cls = globals()[class_name]
+        return Channel(name=dct['name'],
+                       persist=dct['persist'],
+                       connection_type=cls,
+                       **dct['connection_args'])
     return dct
 
 
@@ -269,15 +288,20 @@ class Channel(object):
 
     POLL_FREQUENCY = 0.1  # seconds
 
-    def __init__(self, name=None, uri=None, persist=False):
+    def __init__(self, name=None, persist=False,
+                 connection_type=None, **kwargs):
         """
         :type name: str
-        :type uri: str
+        :type persist: bool
+        :type connection_type: AbstractConnection
+        :type kwargs: Dict
         """
-        self.uri = uri
-        self._name = name or uuid.uuid4().hex
+        self.name = name or uuid.uuid4().hex
+        self.connection_type = connection_type
+        self.connection_args = kwargs
+        self.connection = connection_type(**kwargs)
         self._persist = persist
-        self._conn = RabbitConnection(uri, self._name)
+        self._queue = Queue(self.name, self.connection)
 
     def __enter__(self):
         return self
@@ -293,9 +317,9 @@ class Channel(object):
         try:
             start = time.time()
             while True:
-                if self._conn is None:
+                if self._queue is None:
                     raise ChannelClosedException()
-                msg = self._conn.get()
+                msg = self._queue.get()
                 if msg is not None:
                     return self._process(msg.decode('utf-8'))
                 if time.time() - start > timeout:
@@ -310,31 +334,31 @@ class Channel(object):
         return json.loads(msg, object_hook=as_channel)
 
     def put(self, value):
-        if self._conn is None:
+        if self._queue is None:
             raise ChannelClosedException()
         try:
-            self._conn.put(
+            self._queue.put(
                 json.dumps(value, cls=ChannelEncoder).encode('utf-8'))
         except ChannelEventException:
             self.close()
             raise ChannelClosedException()
 
     def close(self):
-        if self._conn is None:
+        if self._queue is None:
             raise ChannelClosedException()
-        self._conn.close()
-        self._conn = None
+        self._queue.close()
+        self._queue = None
 
     def delete(self):
-        if self._conn is None:
+        if self._queue is None:
             raise ChannelClosedException()
-        self._conn.delete()
+        self._queue.delete()
         self.close()
 
     def close_all(self):
-        if self._conn is None:
+        if self._queue is None:
             raise ChannelClosedException()
-        self._conn.event('close')
+        self._queue.event('close')
         self.close()
 
     def put_sync(self, value, timeout=float('inf')):
@@ -347,39 +371,10 @@ class Channel(object):
         and waits for a response in ``ch``.
 
         """
-        with Channel(uri=self.uri) as ch:
+        with Channel(connection_type=self.connection_type,
+                     **self.connection_args) as ch:
             self.put({
                 'value': value,
                 'reply_to': ch
             })
             return ch.get(timeout=timeout)
-
-
-def test(uri):
-    """
-    a: ChanIn[int]
-    b: ChanIn[str]
-    c: ChanOut[Dict]
-    d: ChanOut[int]
-
-    :type uri: str
-    :rtype: ChanOut[int]
-    """
-    a = Channel(uri=uri)
-    b = Channel(uri=uri)
-    c = Channel(uri=uri)
-
-    a.put(5)
-    b.put('foo')
-
-    x = a.get()
-    assert isinstance(x, int)
-
-    y = b.get()
-    assert isinstance(y, basestring)
-
-    c.put({'a': x, 'b': y})
-
-    d = Channel(uri=a.uri)
-    d.put(5)
-    return d

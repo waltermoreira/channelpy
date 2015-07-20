@@ -8,13 +8,19 @@ import channelpy
 BROKER_URI = os.environ['BROKER']
 
 
+def make_channel(name=None, persist=False):
+    return channelpy.Channel(name=name, persist=persist,
+                             connection_type=channelpy.RabbitConnection,
+                             uri=BROKER_URI)
+
+
 @pytest.fixture(scope='module')
 def anon_ch(request):
 
-    ch = channelpy.Channel(uri=BROKER_URI)
+    ch = make_channel()
 
     def fin():
-        ch2 = channelpy.Channel(name=ch._name, uri=BROKER_URI)
+        ch2 = make_channel(name=ch.name)
         ch2.delete()
 
     request.addfinalizer(fin)
@@ -25,10 +31,10 @@ def anon_ch(request):
 @pytest.fixture(scope='function')
 def closing_ch(request):
 
-    ch = channelpy.Channel(uri=BROKER_URI)
+    ch = make_channel()
 
     def fin():
-        ch2 = channelpy.Channel(name=ch._name, uri=BROKER_URI)
+        ch2 = make_channel(name=ch.name)
         ch2.delete()
 
     request.addfinalizer(fin)
@@ -37,7 +43,6 @@ def closing_ch(request):
 
 
 def test_ch(anon_ch):
-    assert anon_ch.uri == BROKER_URI
     assert anon_ch.put(5) is None
     assert anon_ch.get() == 5
 
@@ -66,8 +71,7 @@ def test_types(anon_ch):
     anon_ch.put(anon_ch)
     ch = anon_ch.get()
     assert isinstance(ch, channelpy.Channel)
-    assert ch._name == anon_ch._name
-    assert ch.uri == anon_ch.uri
+    assert ch.name == anon_ch.name
 
 
 def test_put_sync(anon_ch):
@@ -85,7 +89,7 @@ def test_put_sync(anon_ch):
 
 
 def test_multiple_producers(anon_ch):
-    y = channelpy.Channel(name=anon_ch._name, uri=anon_ch.uri)
+    y = make_channel(anon_ch.name)
     anon_ch.put(1)
     y.put(2)
     assert y.get() == 1
@@ -102,7 +106,7 @@ def test_timeout(anon_ch):
 
 
 def test_multiple_consumers(anon_ch):
-    y = channelpy.Channel(name=anon_ch._name, uri=anon_ch.uri)
+    y = make_channel(name=anon_ch.name)
     anon_ch.put(1)
     anon_ch.put(2)
     assert y.get() == 1
@@ -110,9 +114,9 @@ def test_multiple_consumers(anon_ch):
 
 
 def test_close_all(closing_ch):
-    with channelpy.Channel(uri=BROKER_URI) as resp:
-        a = channelpy.Channel(name=closing_ch._name, uri=closing_ch.uri)
-        b = channelpy.Channel(name=closing_ch._name, uri=closing_ch.uri)
+    with make_channel() as resp:
+        a = make_channel(name=closing_ch.name)
+        b = make_channel(name=closing_ch.name)
 
         def consume(name, ch, resp):
             try:
