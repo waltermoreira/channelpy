@@ -22,80 +22,203 @@ class ChannelEventException(ChannelException):
     pass
 
 
+class RetryException(Exception):
+    pass
+
+
 class AbstractConnection(object):
 
+    def connect(self):
+        """Connect to the broker. """
+
     def close(self):
-        """Close this instance of the channel. """
-        pass
+        """Close this instance of the connection. """
 
-    def delete(self):
+    def create_queue(self, name=None, local=False):
+        """Create a queue.
+
+        This method should be idempotent. Do nothing if the queue is
+        already created.
+
+        If name is None, create a unique name for the queue.
+
+        If local is True, create a temporary queue private to this
+        connection.
+
+        :type name: str
+        :type local: bool
+        :rtype: queue
+        """
+
+    def create_pubsub(self, name):
+        """Create a pubsub endpoint.
+
+        This method should be idempotent. Do nothing if the endpoint is
+        already created.
+
+        :type name: str
+        :rtype: pubsub
+        """
+
+    def delete_queue(self, queue):
         """Delete the queue in the broker. """
-        pass
 
-    def get(self):
+    def delete_pubsub(self, pubsub):
+        """Delete the pubsub in the broker. """
+
+    def subscribe(self, queue, pubsub):
+        """Subscribe queue to pubsub.
+
+        Messages in the pubsub are delivered to queue.
+
+        :type queue: queue
+        :type pubsub: pubsub
+        """
+
+    def publish(self, msg, pubsub):
+        """Publish message in pubsub.
+
+        :type msg: T
+        :type pubsub: pubsub
+        """
+
+    def get(self, queue):
         """Non-blocking get.  Return None if empty.
 
+        :type queue: queue
         :rtype: Optional[T]
         """
-        pass
 
-    def put(self, msg):
+    def put(self, msg, queue):
         """Non-blocking put.
 
         :type msg: T
+        :type queue: queue
+        """
+
+    def retrying(self, f, *args, **kwargs):
+        """Evaluate f(*args, **kwargs). Retry on RetryException.
+
+        :type f: Callable
         """
         pass
 
 
 class RabbitConnection(AbstractConnection):
 
-    _conn = None
-
-    def __init__(self, uri, name):
+    def __init__(self, uri):
         self._uri = uri or 'amqp://127.0.0.1:5672'
-        self._name = name
-        self._reconnect()
 
-    def _reconnect(self):
+        self._conn = None
+        self._ch = None
+
+    def connect(self):
+        """Connect to the broker. """
+
         self._conn = rabbitpy.Connection(self._uri)
         self._ch = self._conn.channel()
 
-        self._exchange = rabbitpy.FanoutExchange(
-            self._ch, self._name, durable=True)
-        self._exchange.declare()
-
-        self._event_queue = rabbitpy.Queue(self._ch, exclusive=True)
-        self._event_queue.declare()
-
-        self._queue = rabbitpy.Queue(self._ch, self._name)
-        self._queue.durable = True
-        self._queue.declare()
-
-        self._event_queue.bind(self._exchange)
-
     def close(self):
-        """Close this instance of the channel."""
+        """Close this instance of the connection. """
 
         self._ch.close()
         self._conn.close()
 
+    def create_queue(self, name=None, local=False):
+        """Create queue for messages.
+
+        :type name: str
+        :type local: bool
+        :rtype: queue
+        """
+        _name = name or ''
+        if local:
+            _queue = rabbitpy.Queue(self._ch, name=_name, exclusive=True)
+        else:
+            _queue = rabbitpy.Queue(self._ch, name=_name, durable=True)
+        _queue.declare()
+        return _queue
+
+    def create_pubsub(self, name):
+        """Create a fanout exchange.
+
+        :type name: str
+        :rtype: pubsub
+        """
+        _exchange = rabbitpy.FanoutExchange(self._ch, name, durable=True)
+        _exchange.declare()
+        return _exchange
+
+    def subscribe(self, queue, pubsub):
+        queue.bind(pubsub)
+
+    def publish(self, msg, pubsub):
+        _msg = rabbitpy.Message(self._ch, msg)
+        _msg.publish(pubsub, '')
+
+    def delete_queue(self, queue):
+        queue.delete()
+
+    def delete_pubsub(self, pubsub):
+        pubsub.delete()
+
+    def get(self, queue):
+        """Non-blocking get.  Return None if empty.
+
+        :type queue: queue
+        :rtype: Optional[T]
+        """
+        _msg = queue.get()
+        if _msg is None:
+            return None
+        _msg.ack()
+        return _msg.body
+
+    def put(self, msg, queue):
+        """Non-blocking put.
+
+        :type msg: T
+        :type queue: queue
+        """
+        _msg = rabbitpy.Message(self._ch, msg, {})
+        _msg.publish('', queue.name)
+
+
+class Queue(object):
+
+    def __init__(self, name, connection=None):
+        self.name = name
+        self.connection = connection
+        self._reconnect()
+
+    def _reconnect(self):
+        self.connection.connect()
+        self._queue = self.connection.create_queue(self.name)
+        self._event_queue = self.connection.create_queue(local=True)
+        self._pubsub = self.connection.create_pubsub(self.name)
+        self.connection.subscribe(self._event_queue, self._pubsub)
+
+    def close(self):
+        """Close this instance of the channel."""
+
+        self.connection.close()
+
     def event(self, ev):
-        """Close all connected instances to this channel."""
-        msg = rabbitpy.Message(self._ch, ev)
-        msg.publish(self._exchange, '')
+        """Publish an event."""
+
+        self.connection.publish(ev)
 
     def delete(self):
         """Delete the queue completely."""
 
-        self._queue.delete()
-        self._exchange.delete()
+        self.connection.delete_queue(self._queue)
+        self.connection.delete_pubsub(self._pubsub)
         self.close()
 
     def _check_for_events(self):
-        ev = self._event_queue.get()
+        ev = self.connection.get(self._event_queue)
         if ev is not None:
-            ev.ack()
-            raise ChannelEventException(ev.body)
+            raise ChannelEventException(ev)
 
     def _retrying(self, f):
         def wrapper(*args, **kwargs):
@@ -111,19 +234,14 @@ class RabbitConnection(AbstractConnection):
 
     def _get(self):
         self._check_for_events()
-        msg = self._queue.get()
-        if msg is None:
-            return None
-        msg.ack()
-        return msg.body
+        return self.connection.get(self._queue)
 
     def get(self):
         return self._retrying(self._get)()
 
     def _put(self, msg):
         self._check_for_events()
-        _msg = rabbitpy.Message(self._ch, msg, {})
-        _msg.publish('', self._name)
+        self.connection.put(msg, self._queue)
 
     def put(self, msg):
         self._retrying(self._put)(msg)
