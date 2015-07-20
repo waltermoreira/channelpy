@@ -313,6 +313,14 @@ class Channel(object):
         else:
             self.close()
 
+    def clone(self, name=None, persist=False):
+        return Channel(name=name, persist=persist,
+                       connection_type=self.connection_type,
+                       **self.connection_args)
+
+    def dup(self):
+        return self.clone(name=self.name, persist=self._persist)
+
     def get(self, timeout=float('inf')):
         try:
             start = time.time()

@@ -139,3 +139,17 @@ def test_close_all(closing_ch):
 
         assert results == {'a', 'b'}
 
+
+def test_clone(anon_ch):
+    with anon_ch.clone() as x:
+        assert x.name != anon_ch.name
+        assert x.connection_type == anon_ch.connection_type
+        assert x.connection_args == anon_ch.connection_args
+
+    with anon_ch.clone(name='foo') as y:
+        assert y.name == 'foo'
+
+
+def test_dup(anon_ch):
+    ch = anon_ch.dup()
+    assert ch.name == anon_ch.name
