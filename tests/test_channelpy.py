@@ -1,6 +1,7 @@
 import os
 import threading
 
+import six
 import pytest
 import channelpy
 
@@ -63,7 +64,7 @@ def test_types(anon_ch):
     anon_ch.put(4)
     assert isinstance(anon_ch.get(), int)
     anon_ch.put('foo')
-    assert isinstance(anon_ch.get(), basestring)
+    assert isinstance(anon_ch.get(), six.string_types)
     anon_ch.put([3, 4])
     assert isinstance(anon_ch.get(), list)
     anon_ch.put({'hi': 'there'})
