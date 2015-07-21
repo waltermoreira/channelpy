@@ -11,19 +11,22 @@ class AbstractConnection(object):
     def close(self):
         """Close this instance of the connection. """
 
-    def create_queue(self, name=None, local=False):
+    def create_queue(self, name=None):
         """Create a queue.
 
         This method should be idempotent. Do nothing if the queue is
         already created.
 
-        If name is None, create a unique name for the queue.
+        :type name: str
+        :rtype: queue
+        """
 
-        If local is True, create a temporary queue private to this
+    def create_local_queue(self):
+        """Create local queue.
+
+        Create a temporary queue private to this
         connection.
 
-        :type name: str
-        :type local: bool
         :rtype: queue
         """
 

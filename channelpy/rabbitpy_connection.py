@@ -26,18 +26,22 @@ class RabbitConnection(AbstractConnection):
         self._ch.close()
         self._conn.close()
 
-    def create_queue(self, name=None, local=False):
+    def create_queue(self, name=None):
         """Create queue for messages.
 
         :type name: str
-        :type local: bool
         :rtype: queue
         """
-        _name = name or ''
-        if local:
-            _queue = rabbitpy.Queue(self._ch, name=_name, exclusive=True)
-        else:
-            _queue = rabbitpy.Queue(self._ch, name=_name, durable=True)
+        _queue = rabbitpy.Queue(self._ch, name=name, durable=True)
+        _queue.declare()
+        return _queue
+
+    def create_local_queue(self):
+        """Create a local queue
+
+        :rtype: queue
+        """
+        _queue = rabbitpy.Queue(self._ch, exclusive=True)
         _queue.declare()
         return _queue
 

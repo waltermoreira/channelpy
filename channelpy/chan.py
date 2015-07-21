@@ -17,7 +17,7 @@ class Queue(object):
     def _reconnect(self):
         self.connection.connect()
         self._queue = self.connection.create_queue(self.name)
-        self._event_queue = self.connection.create_queue(local=True)
+        self._event_queue = self.connection.create_local_queue()
         self._pubsub = self.connection.create_pubsub(self.name)
         self.connection.subscribe(self._event_queue, self._pubsub)
 
