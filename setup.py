@@ -60,6 +60,6 @@ setup(
     packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
 
     # List run-time dependencies here.
-    install_requires=['rabbitpy'],
+    install_requires=['rabbitpy', 'pytest', 'six', 'PyYAML'],
 
 )
