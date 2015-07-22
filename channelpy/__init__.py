@@ -13,6 +13,7 @@ __all__ = [
     'ChannelTimeoutException',
     'ChannelClosedException',
     'ChannelEventException',
+    'ChannelInitConnectionException',
 
     # Abstract objects to create new connections
     'RetryException',
