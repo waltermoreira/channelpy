@@ -163,3 +163,17 @@ def test_clone(anon_ch):
 def test_dup(anon_ch):
     ch = anon_ch.dup()
     assert ch.name == anon_ch.name
+
+
+def test_multiple_close_delete():
+    ch = make_channel()
+    ch.close()
+    with pytest.raises(channelpy.ChannelClosedException):
+        ch.close()
+
+    ch = make_channel()
+    ch.delete()
+    with pytest.raises(channelpy.ChannelClosedException):
+        ch.close()
+
+
