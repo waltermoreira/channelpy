@@ -94,9 +94,13 @@ Run the tests with:
    $ BROKER='amqp://localhost:5672' py.test -v
 
 
-.. implementation_details:
+.. _implementation_details:
 
 Implementation Details
 ======================
 
 To be written.
+
+
+.. _Go: http://golang.org/
+.. _ZeroMQ: http://zeromq.org/
