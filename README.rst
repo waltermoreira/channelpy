@@ -10,7 +10,7 @@ objects that can be passed themselves through the channels.
 
 The current implementation uses RabbitMQ_ as a broker, but it can be
 swapped by other queues or even a peer-to-peer transport mechanism
-such as ZeroMQ_.  See :ref:`implementation_details`.
+such as ZeroMQ_.  See `the implementation details`_.
 
 
 Prerequisite
@@ -104,3 +104,5 @@ To be written.
 
 .. _Go: http://golang.org/
 .. _ZeroMQ: http://zeromq.org/
+.. _RabbitMQ: http://www.rabbitmq.com/
+.. _implementation details: #implementation-details
