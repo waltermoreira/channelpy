@@ -1,9 +1,11 @@
 import os
 import threading
 
+import yaml
 import six
 import pytest
 import channelpy
+import channelpy.chan
 
 
 BROKER_URI = os.environ['BROKER']
@@ -41,6 +43,28 @@ def closing_ch(request):
     request.addfinalizer(fin)
 
     return ch
+
+
+def test_config():
+    orig = channelpy.chan.CONFIG_FILE
+    try:
+        HERE = os.path.dirname(os.path.abspath(__file__))
+        channelpy.chan.CONFIG_FILE = os.path.join(HERE, 'channelpy.yml')
+
+        with open(channelpy.chan.CONFIG_FILE, 'w') as cfg:
+            yaml.dump({
+                'connection': 'RabbitConnection',
+                'arguments': {
+                    'uri': BROKER_URI
+                },
+                'poll_frequency': 0.02
+            }, cfg)
+
+        ch = channelpy.Channel()
+        assert ch.POLL_FREQUENCY == 0.02
+    finally:
+        os.unlink(channelpy.chan.CONFIG_FILE)
+        channelpy.chan.CONFIG_FILE = orig
 
 
 def test_ch(anon_ch):

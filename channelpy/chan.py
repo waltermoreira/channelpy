@@ -1,10 +1,16 @@
 import json
 import time
 import uuid
+import os
+
+import yaml
 
 from .exceptions import *
 from .base_connection import RetryException
 from .connections import connections
+
+
+CONFIG_FILE = '~/.channelpy.yml'
 
 
 class Queue(object):
@@ -108,11 +114,32 @@ class Channel(object):
         :type kwargs: Dict
         """
         self.name = name or uuid.uuid4().hex
-        self.connection_type = connection_type
-        self.connection_args = kwargs
-        self.connection = connection_type(**kwargs)
+        self.connection_args = {}
+
+        # try first to read config from file
+        self._try_config_from_file()
+        # if connection type is still empty, use parameter
+        if connection_type is not None:
+            self.connection_type = connection_type
+        if self.connection_type is None:
+            raise ChannelInitConnectionException(
+                'no connection type found')
+
+        self.connection_args.update(kwargs)
+        self.connection = self.connection_type(**self.connection_args)
         self._persist = persist
         self._queue = Queue(self.name, self.connection)
+
+    def _try_config_from_file(self):
+        try:
+            with open(os.path.expanduser(CONFIG_FILE)) as config:
+                cfg = yaml.load(config)
+        except FileNotFoundError:
+            return
+        self.connection_type = connections[cfg.get('connection', None)]
+        self.connection_args.update(cfg.get('arguments', {}))
+        self.POLL_FREQUENCY = float(cfg.get('poll_frequency',
+                                            self.POLL_FREQUENCY))
 
     def __enter__(self):
         return self

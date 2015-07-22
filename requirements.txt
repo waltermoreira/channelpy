@@ -1,3 +1,4 @@
+PyYAML==3.11
 gnureadline==6.3.3
 ipython==3.2.1
 pamqp==1.6.1

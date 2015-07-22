@@ -16,3 +16,8 @@ class ChannelClosedException(ChannelException):
 class ChannelEventException(ChannelException):
     """Channel event propagation."""
     pass
+
+
+class ChannelInitConnectionException(ChannelException):
+    """Connection initialization exception."""
+    pass
