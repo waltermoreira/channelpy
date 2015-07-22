@@ -105,4 +105,4 @@ To be written.
 .. _Go: http://golang.org/
 .. _ZeroMQ: http://zeromq.org/
 .. _RabbitMQ: http://www.rabbitmq.com/
-.. _implementation details: #implementation-details
+.. _the implementation details: #implementation-details
