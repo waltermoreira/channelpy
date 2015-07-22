@@ -201,3 +201,15 @@ def test_multiple_close_delete():
         ch.close()
 
 
+def test_missing_connection_type():
+    orig = channelpy.chan.CONFIG_FILE
+    try:
+        channelpy.chan.CONFIG_FILE = '/non-existent'
+        with pytest.raises(channelpy.ChannelInitConnectionException):
+            ch = channelpy.Channel()
+        ch2 = channelpy.Channel(connection_type=channelpy.RabbitConnection,
+                                uri=BROKER_URI)
+        assert ch2.connection is not None
+    finally:
+        channelpy.chan.CONFIG_FILE = orig
+

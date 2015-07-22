@@ -114,6 +114,7 @@ class Channel(object):
         :type kwargs: Dict
         """
         self.name = name or uuid.uuid4().hex
+        self.connection_type = None
         self.connection_args = {}
 
         # try first to read config from file
