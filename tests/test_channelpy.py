@@ -125,20 +125,29 @@ def test_close_all(closing_ch):
             except channelpy.ChannelClosedException:
                 resp.put(name)
 
-        ta = threading.Thread(target=consume, args=('a', a, resp))
-        ta.start()
-        tb = threading.Thread(target=consume, args=('b', b, resp))
-        tb.start()
+        channels = []
+        threads = []
+        for i in range(3):
+            x = closing_ch.dup()
+            channels.append(x)
+            tx = threading.Thread(target=consume,
+                                  args=(i, x, resp))
+            tx.start()
+            threads.append(tx)
 
-        assert ta.is_alive() and tb.is_alive()
+        for t in threads:
+            assert t.is_alive()
 
         closing_ch.close_all()
 
-        results = set()
-        results.add(resp.get(timeout=2))
-        results.add(resp.get(timeout=2))
+        for t in threads:
+            t.join()
 
-        assert results == {'a', 'b'}
+        results = set()
+        for _ in channels:
+            results.add(resp.get(timeout=2))
+
+        assert results == set(range(3))
 
 
 def test_clone(anon_ch):
