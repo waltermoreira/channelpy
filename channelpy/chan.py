@@ -15,10 +15,12 @@ CONFIG_FILE = '~/.channelpy.yml'
 
 class Queue(object):
 
-    def __init__(self, name, connection=None):
+    def __init__(self, name, connection=None, retry_timeout=10):
         self.name = name
         self.connection = connection
-        self._reconnect()
+        self.retry_timeout = retry_timeout
+        self._try_until_timeout(self._reconnect,
+                                timeout=retry_timeout)()
 
     def _reconnect(self):
         self.connection.connect()
@@ -48,6 +50,21 @@ class Queue(object):
         ev = self.connection.get(self._event_queue)
         if ev is not None:
             raise ChannelEventException(ev)
+
+    def _try_until_timeout(self, f, timeout=10, sleep=0.01):
+        _f = self.connection.retrying(f)
+
+        def wrapper(*args, **kwargs):
+            start = time.time()
+            while True:
+                try:
+                    return _f(*args, **kwargs)
+                except RetryException:
+                    if time.time() - start > timeout:
+                        raise ChannelTimeoutException()
+                    time.sleep(sleep)
+
+        return wrapper
 
     def _retrying(self, f):
         _f = self.connection.retrying(f)
