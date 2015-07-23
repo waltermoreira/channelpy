@@ -115,7 +115,7 @@ class Channel(object):
 
     POLL_FREQUENCY = 0.1  # seconds
 
-    def __init__(self, name=None, persist=False,
+    def __init__(self, name=None, persist=True,
                  connection_type=None,
                  retry_timeout=None,
                  **kwargs):
@@ -185,13 +185,16 @@ class Channel(object):
         else:
             self.close()
 
-    def clone(self, name=None, persist=False):
-        return Channel(name=name, persist=persist,
+    def clone(self, name=None, persist=True, retry_timeout=None):
+        return Channel(name=name,
+                       persist=persist,
                        connection_type=self.connection_type,
+                       retry_timeout=retry_timeout,
                        **self.connection_args)
 
     def dup(self):
-        return self.clone(name=self.name, persist=self._persist)
+        return self.clone(name=self.name, persist=False,
+                          retry_timeout=self.retry_timeout)
 
     def get(self, timeout=float('inf')):
         try:
@@ -252,6 +255,7 @@ class Channel(object):
 
         """
         with Channel(connection_type=self.connection_type,
+                     persist=False,
                      **self.connection_args) as ch:
             self.put({
                 'value': value,
