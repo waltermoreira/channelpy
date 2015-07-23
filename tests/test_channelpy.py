@@ -11,7 +11,7 @@ import channelpy.chan
 BROKER_URI = os.environ['BROKER']
 
 
-def make_channel(name=None, persist=False):
+def make_channel(name=None, persist=True):
     return channelpy.Channel(name=name, persist=persist,
                              connection_type=channelpy.RabbitConnection,
                              uri=BROKER_URI)
@@ -23,8 +23,7 @@ def anon_ch(request):
     ch = make_channel()
 
     def fin():
-        ch2 = make_channel(name=ch.name)
-        ch2.delete()
+        ch.delete()
 
     request.addfinalizer(fin)
 
@@ -37,7 +36,7 @@ def closing_ch(request):
     ch = make_channel()
 
     def fin():
-        ch2 = make_channel(name=ch.name)
+        ch2 = make_channel(ch.name, persist=False)
         ch2.delete()
 
     request.addfinalizer(fin)
@@ -60,8 +59,8 @@ def test_config():
                 'poll_frequency': 0.02
             }, cfg)
 
-        ch = channelpy.Channel()
-        assert ch.POLL_FREQUENCY == 0.02
+        with channelpy.Channel(persist=False) as ch:
+            assert ch.POLL_FREQUENCY == 0.02
     finally:
         os.unlink(channelpy.chan.CONFIG_FILE)
         channelpy.chan.CONFIG_FILE = orig
@@ -114,11 +113,11 @@ def test_put_sync(anon_ch):
 
 
 def test_multiple_producers(anon_ch):
-    y = make_channel(anon_ch.name)
-    anon_ch.put(1)
-    y.put(2)
-    assert y.get() == 1
-    assert y.get() == 2
+    with make_channel(anon_ch.name) as y:
+        anon_ch.put(1)
+        y.put(2)
+        assert y.get() == 1
+        assert y.get() == 2
 
 
 def test_timeout(anon_ch):
@@ -131,17 +130,15 @@ def test_timeout(anon_ch):
 
 
 def test_multiple_consumers(anon_ch):
-    y = make_channel(name=anon_ch.name)
-    anon_ch.put(1)
-    anon_ch.put(2)
-    assert y.get() == 1
-    assert anon_ch.get() == 2
+    with make_channel(name=anon_ch.name) as y:
+        anon_ch.put(1)
+        anon_ch.put(2)
+        assert y.get() == 1
+        assert anon_ch.get() == 2
 
 
 def test_close_all(closing_ch):
-    with make_channel() as resp:
-        a = make_channel(name=closing_ch.name)
-        b = make_channel(name=closing_ch.name)
+    with make_channel(persist=False) as resp:
 
         def consume(name, ch, resp):
             try:
@@ -175,12 +172,12 @@ def test_close_all(closing_ch):
 
 
 def test_clone(anon_ch):
-    with anon_ch.clone() as x:
+    with anon_ch.clone(persist=False) as x:
         assert x.name != anon_ch.name
         assert x.connection_type == anon_ch.connection_type
         assert x.connection_args == anon_ch.connection_args
 
-    with anon_ch.clone(name='foo') as y:
+    with anon_ch.clone(name='foo', persist=False) as y:
         assert y.name == 'foo'
 
 
@@ -190,12 +187,14 @@ def test_dup(anon_ch):
 
 
 def test_multiple_close_delete():
-    ch = make_channel()
+    ch = make_channel(persist=False)
     ch.close()
     with pytest.raises(channelpy.ChannelClosedException):
         ch.close()
+    ch2 = make_channel(name=ch.name)
+    ch2.delete()
 
-    ch = make_channel()
+    ch = make_channel(persist=False)
     ch.delete()
     with pytest.raises(channelpy.ChannelClosedException):
         ch.close()
@@ -207,9 +206,9 @@ def test_missing_connection_type():
         channelpy.chan.CONFIG_FILE = '/non-existent'
         with pytest.raises(channelpy.ChannelInitConnectionException):
             ch = channelpy.Channel()
-        ch2 = channelpy.Channel(connection_type=channelpy.RabbitConnection,
-                                uri=BROKER_URI)
-        assert ch2.connection is not None
+        with channelpy.Channel(connection_type=channelpy.RabbitConnection,
+                                uri=BROKER_URI, persist=False) as ch2:
+            assert ch2.connection is not None
     finally:
         channelpy.chan.CONFIG_FILE = orig
 
