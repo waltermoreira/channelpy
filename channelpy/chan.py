@@ -73,7 +73,8 @@ class Queue(object):
             try:
                 return _f(*args, **kwargs)
             except RetryException:
-                self._reconnect()
+                self._try_until_timeout(self._reconnect,
+                                        timeout=self.retry_timeout)()
                 return f(*args, **kwargs)
 
         return wrapper
