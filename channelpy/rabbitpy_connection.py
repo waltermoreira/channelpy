@@ -63,10 +63,16 @@ class RabbitConnection(AbstractConnection):
         _msg.publish(pubsub, '')
 
     def delete_queue(self, queue):
-        queue.delete()
+        try:
+            queue.delete()
+        except rabbitpy.exceptions.RabbitpyException:
+            pass
 
     def delete_pubsub(self, pubsub):
-        pubsub.delete()
+        try:
+            pubsub.delete()
+        except rabbitpy.exceptions.RabbitpyException:
+            pass
 
     def get(self, queue):
         """Non-blocking get.  Return None if empty.
