@@ -15,12 +15,14 @@ CONFIG_FILE = '~/.channelpy.yml'
 
 class Queue(object):
 
-    def __init__(self, name, connection=None, retry_timeout=10):
+    DEFAULT_RETRY_TIMEOUT = 10
+
+    def __init__(self, name, connection=None, retry_timeout=None):
         self.name = name
         self.connection = connection
-        self.retry_timeout = retry_timeout
+        self.retry_timeout = retry_timeout or self.DEFAULT_RETRY_TIMEOUT
         self._try_until_timeout(self._reconnect,
-                                timeout=retry_timeout)()
+                                timeout=self.retry_timeout)()
 
     def _reconnect(self):
         self.connection.connect()
@@ -124,7 +126,9 @@ class Channel(object):
     POLL_FREQUENCY = 0.1  # seconds
 
     def __init__(self, name=None, persist=False,
-                 connection_type=None, **kwargs):
+                 connection_type=None,
+                 retry_timeout=None,
+                 **kwargs):
         """
         :type name: str
         :type persist: bool
@@ -133,6 +137,7 @@ class Channel(object):
         """
         self.name = name or uuid.uuid4().hex
         self.connection_type = None
+        self.retry_timeout = retry_timeout
         self.connection_args = {}
 
         # try first to read config from file
@@ -147,7 +152,8 @@ class Channel(object):
         self.connection_args.update(kwargs)
         self.connection = self.connection_type(**self.connection_args)
         self._persist = persist
-        self._queue = Queue(self.name, self.connection)
+        self._queue = Queue(self.name, self.connection,
+                            retry_timeout=self.retry_timeout)
 
     def _try_config_from_file(self):
         try:
@@ -157,6 +163,7 @@ class Channel(object):
             return
         self.connection_type = connections[cfg.get('connection', None)]
         self.connection_args.update(cfg.get('arguments', {}))
+        self.retry_timeout = cfg.get('retry_timeout', None)
         self.POLL_FREQUENCY = float(cfg.get('poll_frequency',
                                             self.POLL_FREQUENCY))
 
