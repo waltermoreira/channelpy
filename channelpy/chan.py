@@ -100,24 +100,14 @@ class ChannelEncoder(json.JSONEncoder):
 
     def default(self, obj):
         if isinstance(obj, Channel):
-            return {
-                '__channel__': True,
-                'name': obj.name,
-                'connection_type': obj.connection_type.__name__,
-                'connection_args': obj.connection_args,
-                'persist': obj._persist
-            }
+            return obj.to_json()
         return super(ChannelEncoder, self).default(obj)
 
 
 def as_channel(dct):
     if '__channel__' in dct:
-        class_name = dct['connection_type']
-        cls = connections[class_name]
-        return Channel(name=dct['name'],
-                       persist=dct['persist'],
-                       connection_type=cls,
-                       **dct['connection_args'])
+        return Channel.from_json(dct)
+
     return dct
 
 
@@ -154,6 +144,24 @@ class Channel(object):
         self._persist = persist
         self._queue = Queue(self.name, self.connection,
                             retry_timeout=self.retry_timeout)
+
+    def to_json(self):
+        return {
+            '__channel__': True,
+            'name': self.name,
+            'connection_type': self.connection_type.__name__,
+            'retry_timeout': self.retry_timeout,
+            'connection_args': self.connection_args
+        }
+
+    @classmethod
+    def from_json(cls, obj):
+        class_name = obj['connection_type']
+        conn_cls = connections[class_name]
+        return cls(name=obj['name'],
+                   connection_type=conn_cls,
+                   retry_timeout=obj['retry_timeout'],
+                   **obj['connection_args'])
 
     def _try_config_from_file(self):
         try:
