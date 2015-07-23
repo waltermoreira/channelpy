@@ -76,7 +76,7 @@ Quickstart
 
 - Multiple consumers and producers can be attached to a
   channel. Messages are delivered in round-robin fashion to
-  consumers. However, a ``close_all` can be delivered to all the
+  consumers. However, a ``close_all`` can be delivered to all the
   consumers to signal a full termination of the channel.
 
   .. code-block:: python
