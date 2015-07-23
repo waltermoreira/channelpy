@@ -74,6 +74,23 @@ Quickstart
 
      >>> ch = Channel(name='my_channel')
 
+- Multiple consumers and producers can be attached to a
+  channel. Messages are delivered in round-robin fashion to
+  consumers. However, a ``close_all` can be delivered to all the
+  consumers to signal a full termination of the channel.
+
+  .. code-block:: python
+
+     >>> ch = Channel()
+     >>> def f(c):
+     ...     while True:
+     ...         print(c.get())
+     ...
+     >>> threading.Thread(target=f, args=(ch,)).start()
+     >>> threading.Thread(target=f, args=(ch,)).start()
+     >>> ch.put(4)        # one of the threads will print 4
+     >>> ch.close_all()   # ChannelClosedException is raised in all threads
+
 - The broker to use can be configured at instantiation time or by
   using the config file ``~/.channelpy.yml``.  For example:
 
