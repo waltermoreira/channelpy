@@ -21,3 +21,8 @@ class ChannelEventException(ChannelException):
 class ChannelInitConnectionException(ChannelException):
     """Connection initialization exception."""
     pass
+
+
+class ChannelCloseAllException(ChannelException):
+    """Event to closee all produces and consumers."""
+    pass

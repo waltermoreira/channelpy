@@ -212,3 +212,16 @@ def test_missing_connection_type():
     finally:
         channelpy.chan.CONFIG_FILE = orig
 
+
+def test_events(anon_ch):
+    with anon_ch.dup() as ch:
+        ch.event(5)
+        with pytest.raises(channelpy.ChannelEventException) as exc1:
+            ch.put(3)
+        assert exc1.value.args == (5,)
+        with pytest.raises(channelpy.ChannelEventException) as exc2:
+            anon_ch.put(1)
+        assert exc2.value.args == (5,)
+        # verify all is well afterwards
+        ch.put(0)
+        assert ch.get(timeout=1) == 0

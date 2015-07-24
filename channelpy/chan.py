@@ -50,8 +50,13 @@ class Queue(object):
 
     def _check_for_events(self):
         ev = self.connection.get(self._event_queue)
-        if ev is not None:
-            raise ChannelEventException(ev)
+        if ev is None:
+            return
+        obj = json.loads(ev.decode('utf-8'))
+        if obj == 'close':
+            raise ChannelCloseAllException()
+        else:
+            raise ChannelEventException(obj)
 
     def _try_until_timeout(self, f, timeout=10, sleep=0.01):
         _f = self.connection.retrying(f)
@@ -109,6 +114,18 @@ def as_channel(dct):
         return Channel.from_json(dct)
 
     return dct
+
+
+def checking_events(f):
+
+    def wrapper(self, *args, **kwargs):
+        try:
+            return f(self, *args, **kwargs)
+        except ChannelCloseAllException:
+            self.close()
+            raise ChannelClosedException()
+
+    return wrapper
 
 
 class Channel(object):
@@ -196,35 +213,29 @@ class Channel(object):
         return self.clone(name=self.name, persist=False,
                           retry_timeout=self.retry_timeout)
 
+    @checking_events
     def get(self, timeout=float('inf')):
-        try:
-            start = time.time()
-            while True:
-                if self._queue is None:
-                    raise ChannelClosedException()
-                msg = self._queue.get()
-                if msg is not None:
-                    return self._process(msg.decode('utf-8'))
-                if time.time() - start > timeout:
-                    raise ChannelTimeoutException()
-                time.sleep(self.POLL_FREQUENCY)
-        except ChannelEventException:
-            self.close()
-            raise ChannelClosedException()
+        start = time.time()
+        while True:
+            if self._queue is None:
+                raise ChannelClosedException()
+            msg = self._queue.get()
+            if msg is not None:
+                return self._process(msg.decode('utf-8'))
+            if time.time() - start > timeout:
+                raise ChannelTimeoutException()
+            time.sleep(self.POLL_FREQUENCY)
 
     @staticmethod
     def _process(msg):
         return json.loads(msg, object_hook=as_channel)
 
+    @checking_events
     def put(self, value):
         if self._queue is None:
             raise ChannelClosedException()
-        try:
-            self._queue.put(
-                json.dumps(value, cls=ChannelEncoder).encode('utf-8'))
-        except ChannelEventException:
-            self.close()
-            raise ChannelClosedException()
+        self._queue.put(
+            json.dumps(value, cls=ChannelEncoder).encode('utf-8'))
 
     def close(self):
         if self._queue is None:
@@ -241,8 +252,14 @@ class Channel(object):
     def close_all(self):
         if self._queue is None:
             raise ChannelClosedException()
-        self._queue.event('close')
+        self._queue.event(
+            json.dumps('close').encode('utf-8'))
         self.close()
+
+    def event(self, obj):
+        if self._queue is None:
+            raise ChannelClosedException()
+        self._queue.event(json.dumps(obj).encode('utf-8'))
 
     def put_sync(self, value, timeout=float('inf')):
         """Synchronous put.
