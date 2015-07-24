@@ -3,6 +3,7 @@ import time
 import uuid
 import os
 import errno
+import threading
 
 import yaml
 
@@ -35,7 +36,11 @@ class Queue(object):
     def close(self):
         """Close this instance of the channel."""
 
-        self.connection.close()
+        def _close(this):
+            this.connection.close()
+
+        t = threading.Thread(target=_close, args=(self,))
+        t.start()
 
     def event(self, ev):
         """Publish an event."""
@@ -45,9 +50,13 @@ class Queue(object):
     def delete(self):
         """Delete the queue completely."""
 
-        self.connection.delete_queue(self._queue)
-        self.connection.delete_pubsub(self._pubsub)
-        self.close()
+        def _delete(this):
+            this.connection.delete_queue(this._queue)
+            this.connection.delete_pubsub(this._pubsub)
+            this.close()
+
+        t = threading.Thread(target=_delete, args=(self,))
+        t.start()
 
     def _check_for_events(self):
         ev = self.connection.get(self._event_queue)
