@@ -2,6 +2,7 @@ import json
 import time
 import uuid
 import os
+import errno
 
 import yaml
 
@@ -184,8 +185,10 @@ class Channel(object):
         try:
             with open(os.path.expanduser(CONFIG_FILE)) as config:
                 cfg = yaml.load(config)
-        except FileNotFoundError:
-            return
+        except IOError as exc:
+            if exc.errno == errno.ENOENT:
+                return
+            raise
         self.connection_type = connections[cfg.get('connection', None)]
         self.connection_args.update(cfg.get('arguments', {}))
         self.retry_timeout = cfg.get('retry_timeout', None)
