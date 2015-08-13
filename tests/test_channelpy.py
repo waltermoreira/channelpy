@@ -11,8 +11,8 @@ import channelpy.chan
 BROKER_URI = os.environ['BROKER']
 
 
-def make_channel(name=None, persist=True):
-    return channelpy.Channel(name=name, persist=persist,
+def make_channel(name=None, rm=False):
+    return channelpy.Channel(name=name, rm=rm,
                              connection_type=channelpy.RabbitConnection,
                              uri=BROKER_URI)
 
@@ -36,7 +36,7 @@ def closing_ch(request):
     ch = make_channel()
 
     def fin():
-        ch2 = make_channel(ch.name, persist=False)
+        ch2 = make_channel(ch.name, rm=True)
         ch2.delete()
 
     request.addfinalizer(fin)
@@ -59,7 +59,7 @@ def test_config():
                 'poll_frequency': 0.02
             }, cfg)
 
-        with channelpy.Channel(persist=False) as ch:
+        with channelpy.Channel(rm=True) as ch:
             assert ch.POLL_FREQUENCY == 0.02
     finally:
         os.unlink(channelpy.chan.CONFIG_FILE)
@@ -138,7 +138,7 @@ def test_multiple_consumers(anon_ch):
 
 
 def test_close_all(closing_ch):
-    with make_channel(persist=False) as resp:
+    with make_channel(rm=True) as resp:
 
         def consume(name, ch, resp):
             try:
@@ -172,12 +172,12 @@ def test_close_all(closing_ch):
 
 
 def test_clone(anon_ch):
-    with anon_ch.clone(persist=False) as x:
+    with anon_ch.clone(rm=True) as x:
         assert x.name != anon_ch.name
         assert x.connection_type == anon_ch.connection_type
         assert x.connection_args == anon_ch.connection_args
 
-    with anon_ch.clone(name='foo', persist=False) as y:
+    with anon_ch.clone(name='foo', rm=True) as y:
         assert y.name == 'foo'
 
 
@@ -187,14 +187,14 @@ def test_dup(anon_ch):
 
 
 def test_multiple_close_delete():
-    ch = make_channel(persist=False)
+    ch = make_channel(rm=True)
     ch.close()
     with pytest.raises(channelpy.ChannelClosedException):
         ch.close()
     ch2 = make_channel(name=ch.name)
     ch2.delete()
 
-    ch = make_channel(persist=False)
+    ch = make_channel(rm=True)
     ch.delete()
     with pytest.raises(channelpy.ChannelClosedException):
         ch.close()
@@ -207,7 +207,7 @@ def test_missing_connection_type():
         with pytest.raises(channelpy.ChannelInitConnectionException):
             ch = channelpy.Channel()
         with channelpy.Channel(connection_type=channelpy.RabbitConnection,
-                                uri=BROKER_URI, persist=False) as ch2:
+                                uri=BROKER_URI, rm=True) as ch2:
             assert ch2.connection is not None
     finally:
         channelpy.chan.CONFIG_FILE = orig

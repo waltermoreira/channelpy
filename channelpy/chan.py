@@ -142,13 +142,13 @@ class Channel(object):
 
     POLL_FREQUENCY = 0.1  # seconds
 
-    def __init__(self, name=None, persist=True,
+    def __init__(self, name=None, rm=False,
                  connection_type=None,
                  retry_timeout=None,
                  **kwargs):
         """
         :type name: str
-        :type persist: bool
+        :type rm: bool
         :type connection_type: AbstractConnection
         :type kwargs: Dict
         """
@@ -168,7 +168,7 @@ class Channel(object):
 
         self.connection_args.update(kwargs)
         self.connection = self.connection_type(**self.connection_args)
-        self._persist = persist
+        self._rm = rm
         self._queue = Queue(self.name, self.connection,
                             retry_timeout=self.retry_timeout)
 
@@ -209,20 +209,20 @@ class Channel(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         del exc_type, exc_val, exc_tb
-        if not self._persist:
+        if self._rm:
             self.delete()
         else:
             self.close()
 
-    def clone(self, name=None, persist=True, retry_timeout=None):
+    def clone(self, name=None, rm=False, retry_timeout=None):
         return Channel(name=name,
-                       persist=persist,
+                       rm=rm,
                        connection_type=self.connection_type,
                        retry_timeout=retry_timeout,
                        **self.connection_args)
 
     def dup(self):
-        return self.clone(name=self.name, persist=False,
+        return self.clone(name=self.name, rm=True,
                           retry_timeout=self.retry_timeout)
 
     @checking_events
@@ -284,7 +284,7 @@ class Channel(object):
 
         """
         with Channel(connection_type=self.connection_type,
-                     persist=False,
+                     rm=True,
                      **self.connection_args) as ch:
             self.put({
                 'value': value,
