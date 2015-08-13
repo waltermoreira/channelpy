@@ -142,7 +142,7 @@ class Channel(object):
 
     POLL_FREQUENCY = 0.1  # seconds
 
-    def __init__(self, name=None, rm=False,
+    def __init__(self, name=None, rm=True,
                  connection_type=None,
                  retry_timeout=None,
                  **kwargs):
