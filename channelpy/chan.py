@@ -159,7 +159,9 @@ class Channel(object):
 
         # try first to read config from file
         self._try_config_from_file()
-        # if connection type is still empty, use parameter
+        # overwrite with env variables, if any
+        self._try_env_variables()
+        # overwrite with parameter, if any
         if connection_type is not None:
             self.connection_type = connection_type
         if self.connection_type is None:
@@ -189,6 +191,17 @@ class Channel(object):
                    connection_type=conn_cls,
                    retry_timeout=obj['retry_timeout'],
                    **obj['connection_args'])
+
+    def _try_env_variables(self):
+        try:
+            self.connection_type = connections[
+                os.environ['CHANNELPY_CONNECTION_TYPE']]
+        except KeyError:
+            pass
+        try:
+            self.connection_args.update({'uri': os.environ['CHANNELPY_URI']})
+        except KeyError:
+            pass
 
     def _try_config_from_file(self):
         try:
