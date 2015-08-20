@@ -140,7 +140,7 @@ def checking_events(f):
 
 class Channel(object):
 
-    POLL_FREQUENCY = 0.1  # seconds
+    POLL_FREQUENCY = 0.01  # seconds
 
     def __init__(self, name=None, rm=False,
                  connection_type=None,
