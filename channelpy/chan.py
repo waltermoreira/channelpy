@@ -9,6 +9,7 @@ import yaml
 
 from .exceptions import *
 from .base_connection import RetryException
+from .rabbitpy_connection import RabbitConnection
 from .connections import connections
 
 
@@ -153,10 +154,11 @@ class Channel(object):
         :type kwargs: Dict
         """
         self.name = name or uuid.uuid4().hex
-        self.connection_type = None
+        self.connection_type = RabbitConnection
         self.retry_timeout = retry_timeout
         self.connection_args = {}
 
+        
         # try first to read config from file
         self._try_config_from_file()
         # overwrite with env variables, if any
@@ -211,7 +213,8 @@ class Channel(object):
             if exc.errno == errno.ENOENT:
                 return
             raise
-        self.connection_type = connections[cfg.get('connection', None)]
+        if 'connection' in cfg:
+            self.connection_type = connections[cfg['connection']]
         self.connection_args.update(cfg.get('arguments', {}))
         self.retry_timeout = cfg.get('retry_timeout', None)
         self.POLL_FREQUENCY = float(cfg.get('poll_frequency',

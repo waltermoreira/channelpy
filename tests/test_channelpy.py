@@ -204,11 +204,8 @@ def test_missing_connection_type():
     orig = channelpy.chan.CONFIG_FILE
     try:
         channelpy.chan.CONFIG_FILE = '/non-existent'
-        with pytest.raises(channelpy.ChannelInitConnectionException):
-            ch = channelpy.Channel()
-        with channelpy.Channel(connection_type=channelpy.RabbitConnection,
-                                uri=BROKER_URI, rm=True) as ch2:
-            assert ch2.connection is not None
+        with channelpy.Channel(uri=BROKER_URI, rm=True) as ch2:
+            assert isinstance(ch2.connection, channelpy.RabbitConnection)
     finally:
         channelpy.chan.CONFIG_FILE = orig
 
