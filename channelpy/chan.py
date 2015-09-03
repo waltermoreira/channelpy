@@ -4,6 +4,7 @@ import uuid
 import os
 import errno
 import threading
+import socket
 
 import yaml
 
@@ -158,8 +159,9 @@ class Channel(object):
         self.retry_timeout = retry_timeout
         self.connection_args = {}
 
-        
-        # try first to read config from file
+        # try to resolve token via gethostbyname
+        self._try_resolve_host()
+        # try to read config from file
         self._try_config_from_file()
         # overwrite with env variables, if any
         self._try_env_variables()
@@ -193,6 +195,14 @@ class Channel(object):
                    connection_type=conn_cls,
                    retry_timeout=obj['retry_timeout'],
                    **obj['connection_args'])
+
+    def _try_resolve_host(self):
+        token = os.environ.get('CHANNELPY_RABBITMQ_HOSTNAME', 'rabbit')
+        try:
+            host = socket.gethostbyname(token)
+            self.connection_args.update({'uri': 'amqp://{}:5672'.format(host)})
+        except socket.error:
+            pass
 
     def _try_env_variables(self):
         try:
