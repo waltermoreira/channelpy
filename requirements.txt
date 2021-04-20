@@ -2,7 +2,7 @@ PyYAML==3.11
 gnureadline==6.3.3
 ipython==3.2.1
 pamqp==1.6.1
-py==1.4.30
+py==1.10.0
 pytest==2.7.2
 -e git://github.com/gmr/rabbitpy.git@b2c33d5ccade60977347d1ef6cce4dd5fb403c4c#egg=rabbitpy
 six==1.9.0
