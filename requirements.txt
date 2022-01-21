@@ -1,6 +1,6 @@
 PyYAML==3.11
 gnureadline==6.3.3
-ipython==3.2.1
+ipython==7.16.3
 pamqp==1.6.1
 py==1.4.30
 pytest==2.7.2
